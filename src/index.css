@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #3b82f6;
+  --color-primary-dark: #2563eb;
+  --color-accent: #22c55e;
+  --color-accent-dark: #16a34a;
+  --color-xp: #eab308;
+  --color-xp-dark: #ca8a04;
+  --color-surface: #0f172a;
+  --color-surface-light: #1e293b;
+  --color-surface-lighter: #334155;
+  --color-border: #475569;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.glow-active {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.glow-xp {
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.4);
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes popIn {
+  0%   { transform: scale(0.72); opacity: 0; }
+  65%  { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
+@keyframes heartPop {
+  0%   { transform: scale(1); }
+  20%  { transform: scale(1.6); }
+  50%  { transform: scale(0.84); }
+  75%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+@keyframes swipeHintAnim {
+  0%   { opacity: 0; }
+  18%  { opacity: 0.6; }
+  75%  { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+@keyframes rankRowIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 4px 20px rgba(232,69,60,0.3); }
+  50%       { box-shadow: 0 4px 32px rgba(232,69,60,0.6), 0 0 0 4px rgba(232,69,60,0.1); }
+}
