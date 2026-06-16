@@ -86,6 +86,16 @@ export function StoreProvider({ children }) {
     })
   }, [])
 
+  const bulkAddCards = useCallback(async (gameId, newCards) => {
+    const snap = await getDoc(doc(db, 'games', gameId))
+    if (!snap.exists()) return 0
+    const existing = snap.data().cards ?? []
+    const startId = existing.length > 0 ? Math.max(...existing.map(c => c.id)) + 1 : 1
+    const withIds = newCards.map((c, i) => ({ ...c, id: startId + i }))
+    await updateDoc(doc(db, 'games', gameId), { cards: [...existing, ...withIds] })
+    return withIds.length
+  }, [])
+
   // Categories
   const addCategory = useCallback(async (cat) => {
     await setDoc(doc(db, 'categories', cat.id), cat)
@@ -117,7 +127,7 @@ export function StoreProvider({ children }) {
     <StoreContext.Provider value={{
       games, categories, tags, loading,
       addGame, editGame, deleteGame,
-      addCard, editCard, deleteCard,
+      addCard, editCard, deleteCard, bulkAddCards,
       addCategory, editCategory, deleteCategory,
       addTag, deleteTag,
     }}>
