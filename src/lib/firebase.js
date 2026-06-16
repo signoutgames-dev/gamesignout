@@ -19,13 +19,21 @@ export const db = getFirestore(app)
 const googleProvider = new GoogleAuthProvider()
 googleProvider.setCustomParameters({ prompt: 'select_account' })
 
-// Mobile browsers (especially iOS Safari) block popups — use redirect instead
-const isMobile = () => /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-
-export const signInWithGoogle = () =>
-  isMobile()
-    ? signInWithRedirect(auth, googleProvider)
-    : signInWithPopup(auth, googleProvider)
+// Try popup first (better UX). If the browser blocks it (mobile PWA, iOS restrictions),
+// fall back to redirect. signInWithRedirect result is picked up by getRedirectResult on next load.
+export const signInWithGoogle = async () => {
+  try {
+    return await signInWithPopup(auth, googleProvider)
+  } catch (err) {
+    if (
+      err.code === 'auth/popup-blocked' ||
+      err.code === 'auth/operation-not-supported-in-this-environment'
+    ) {
+      return signInWithRedirect(auth, googleProvider)
+    }
+    throw err
+  }
+}
 
 export const signOutUser = () => signOut(auth)
 export { onAuthStateChanged, getRedirectResult }
