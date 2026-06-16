@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, MessageSquare, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../context/StoreContext'
 
-const BLANK = { title: '', category: 'couple', tags: '', duration: '15 min', minPlayers: 2, maxPlayers: 8, rule1: '', rule2: '', rule3: '', tip: '' }
+const BLANK = { title: '', category: 'couple', tags: '', duration: '15 min', minPlayers: 2, maxPlayers: 8, rule1: '', rule2: '', rule3: '', tip: '', labels: [], levels: [] }
 
 const inp = (extra = {}) => ({
   background: '#161616', border: '1px solid #252525', borderRadius: '8px',
@@ -37,13 +37,58 @@ function Field({ label, children }) {
   )
 }
 
+function ChipInput({ value, onChange, chips, onAdd, onRemove, placeholder, accentColor, accentBg }) {
+  return (
+    <>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: chips.length > 0 ? '10px' : '0' }}>
+        <input
+          style={inp({ flex: 1, width: 'auto' })}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onAdd() } }}
+          onFocus={(e) => { e.target.style.borderColor = accentColor }}
+          onBlur={(e) => { e.target.style.borderColor = '#252525' }}
+        />
+        <button
+          onClick={onAdd}
+          style={{ background: accentColor, border: 'none', borderRadius: '8px', padding: '10px 14px', color: '#111', fontSize: '12px', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+        >
+          + Add
+        </button>
+      </div>
+      {chips.length > 0 ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          {chips.map((chip, i) => (
+            <span
+              key={i}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: accentBg, border: `1px solid ${accentColor}55`, borderRadius: '999px', padding: '4px 10px 4px 12px', fontSize: '12px', color: accentColor, fontWeight: 600 }}
+            >
+              {chip}
+              <button onClick={() => onRemove(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: accentColor, padding: '0', display: 'flex', alignItems: 'center', opacity: 0.7 }}>
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', margin: '4px 0 0', fontStyle: 'italic' }}>
+          Type a name and press Add or Enter
+        </p>
+      )}
+    </>
+  )
+}
+
 export function AdminGames() {
   const { games, categories, addGame, editGame, deleteGame } = useStore()
   const navigate = useNavigate()
-  const [modal, setModal] = useState(null) // null | { mode: 'add' | 'edit', data }
+  const [modal, setModal] = useState(null)
   const [form, setForm] = useState(BLANK)
+  const [labelInput, setLabelInput] = useState('')
+  const [levelInput, setLevelInput] = useState('')
 
-  const openAdd = () => { setForm(BLANK); setModal({ mode: 'add' }) }
+  const openAdd = () => { setForm(BLANK); setModal({ mode: 'add' }); setLabelInput(''); setLevelInput('') }
   const openEdit = (g) => {
     setForm({
       title: g.title, category: g.category,
@@ -52,12 +97,32 @@ export function AdminGames() {
       minPlayers: g.minPlayers, maxPlayers: g.maxPlayers,
       rule1: g.rules?.[0]?.text || '', rule2: g.rules?.[1]?.text || '', rule3: g.rules?.[2]?.text || '',
       tip: g.tip || '',
+      labels: g.labels || [],
+      levels: g.levels || [],
     })
     setModal({ mode: 'edit', id: g.id })
+    setLabelInput('')
+    setLevelInput('')
   }
   const close = () => setModal(null)
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  const addLabel = () => {
+    const l = labelInput.trim().toUpperCase()
+    if (!l || form.labels.includes(l)) return
+    setForm(f => ({ ...f, labels: [...f.labels, l] }))
+    setLabelInput('')
+  }
+  const removeLabel = (i) => setForm(f => ({ ...f, labels: f.labels.filter((_, idx) => idx !== i) }))
+
+  const addLevel = () => {
+    const l = levelInput.trim()
+    if (!l || form.levels.includes(l)) return
+    setForm(f => ({ ...f, levels: [...f.levels, l] }))
+    setLevelInput('')
+  }
+  const removeLevel = (i) => setForm(f => ({ ...f, levels: f.levels.filter((_, idx) => idx !== i) }))
 
   const slugify = (t) => t.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '-' + Date.now()
 
@@ -78,6 +143,8 @@ export function AdminGames() {
         rules,
         tip: form.tip,
         cards: [],
+        labels: form.labels,
+        levels: form.levels,
       })
     } else {
       editGame(modal.id, {
@@ -89,6 +156,8 @@ export function AdminGames() {
         maxPlayers: Number(form.maxPlayers),
         rules,
         tip: form.tip,
+        labels: form.labels,
+        levels: form.levels,
       })
     }
     close()
@@ -120,9 +189,8 @@ export function AdminGames() {
 
       {/* Table */}
       <div style={{ background: '#111', border: '1px solid #1e1e1e', borderRadius: '12px', overflow: 'hidden' }}>
-        {/* Head */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 70px 100px 120px', gap: '0', padding: '10px 16px', borderBottom: '1px solid #1e1e1e', background: '#0d0d0d' }}>
-          {['Game', 'Category', 'Cards', 'Duration', 'Actions'].map(h => (
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 60px 70px 70px 90px 120px', gap: '0', padding: '10px 16px', borderBottom: '1px solid #1e1e1e', background: '#0d0d0d' }}>
+          {['Game', 'Category', 'Cards', 'Labels', 'Levels', 'Duration', 'Actions'].map(h => (
             <span key={h} style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1px', textTransform: 'uppercase' }}>{h}</span>
           ))}
         </div>
@@ -134,7 +202,7 @@ export function AdminGames() {
         {games.map((g, i) => (
           <div
             key={g.id}
-            style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 70px 100px 120px', gap: '0', padding: '13px 16px', borderBottom: i < games.length - 1 ? '1px solid #1a1a1a' : 'none', alignItems: 'center', transition: 'background 0.12s' }}
+            style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 60px 70px 70px 90px 120px', gap: '0', padding: '13px 16px', borderBottom: i < games.length - 1 ? '1px solid #1a1a1a' : 'none', alignItems: 'center', transition: 'background 0.12s' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = '#141414' }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
           >
@@ -142,10 +210,16 @@ export function AdminGames() {
               <p style={{ fontWeight: 700, fontSize: '13px', color: '#fff', margin: '0 0 2px' }}>{g.title}</p>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>{g.minPlayers}–{g.maxPlayers} players</p>
             </div>
-            <span style={{ fontSize: '12px' }}>
-              <span style={{ background: '#1a1a1a', padding: '3px 10px', borderRadius: '999px', color: 'rgba(255,255,255,0.6)' }}>{g.category}</span>
+            <span>
+              <span style={{ background: '#1a1a1a', padding: '3px 10px', borderRadius: '999px', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{g.category}</span>
             </span>
             <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{g.cards?.length || 0}</span>
+            <span style={{ fontSize: '13px', fontWeight: 700 }}>
+              {g.labels?.length > 0 ? <span style={{ color: '#f5c542' }}>{g.labels.length}</span> : <span style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>}
+            </span>
+            <span style={{ fontSize: '13px', fontWeight: 700 }}>
+              {g.levels?.length > 0 ? <span style={{ color: '#a78bfa' }}>{g.levels.length}</span> : <span style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>}
+            </span>
             <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{g.duration}</span>
             <div style={{ display: 'flex', gap: '6px' }}>
               <button
@@ -207,6 +281,35 @@ export function AdminGames() {
           <Field label="Tags (comma separated)">
             <input style={inp()} value={form.tags} onChange={set('tags')} placeholder="Spicy, Fun, Adults" onFocus={(e)=>{e.target.style.borderColor='#e8453c'}} onBlur={(e)=>{e.target.style.borderColor='#252525'}} />
           </Field>
+
+          {/* Labels — appear as dropdown options in question prompt type */}
+          <Field label="Labels (prompt types for questions)">
+            <ChipInput
+              value={labelInput}
+              onChange={setLabelInput}
+              chips={form.labels}
+              onAdd={addLabel}
+              onRemove={removeLabel}
+              placeholder="e.g. NEVER HAVE I EVER, DARE"
+              accentColor="#f5c542"
+              accentBg="rgba(245,197,66,0.1)"
+            />
+          </Field>
+
+          {/* Levels */}
+          <Field label="Levels (difficulty / rounds for questions)">
+            <ChipInput
+              value={levelInput}
+              onChange={setLevelInput}
+              chips={form.levels}
+              onAdd={addLevel}
+              onRemove={removeLevel}
+              placeholder="e.g. Easy, Medium, Hard"
+              accentColor="#a78bfa"
+              accentBg="rgba(167,139,250,0.1)"
+            />
+          </Field>
+
           <Field label="Rule 1">
             <input style={inp()} value={form.rule1} onChange={set('rule1')} placeholder="How the first turn works" onFocus={(e)=>{e.target.style.borderColor='#e8453c'}} onBlur={(e)=>{e.target.style.borderColor='#252525'}} />
           </Field>
