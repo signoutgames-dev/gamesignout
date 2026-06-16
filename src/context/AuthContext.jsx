@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { auth, signInWithGoogle, signOutUser, onAuthStateChanged } from '../lib/firebase'
+import { auth, signInWithGoogle, signOutUser, onAuthStateChanged, getRedirectResult } from '../lib/firebase'
 
 const AuthContext = createContext(null)
 
@@ -8,6 +8,10 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u ?? null))
+    // Catch errors from mobile redirect flow (success is handled by onAuthStateChanged)
+    getRedirectResult(auth).catch((err) => {
+      if (err.code !== 'auth/popup-closed-by-user') console.error('Redirect auth error:', err)
+    })
     return unsub
   }, [])
 
@@ -15,7 +19,8 @@ export function AuthProvider({ children }) {
     try {
       await signInWithGoogle()
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user') console.error(err)
+      const ignored = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request']
+      if (!ignored.includes(err.code)) console.error(err)
     }
   }
 

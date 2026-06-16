@@ -117,12 +117,20 @@ export function GamePlay() {
   const [dragX, setDragX]             = useState(0)
   const [heartBeat, setHeartBeat]     = useState(false)
   const [showHint, setShowHint]       = useState(true)
-  const dragStartX = useRef(null)
+  const dragStartX   = useRef(null)
+  const advanceTimer = useRef(null)
+  const heartTimer   = useRef(null)
 
   useEffect(() => { if (game) recordGameStarted(game.id) }, [game?.id]) // eslint-disable-line
   useEffect(() => {
     const t = setTimeout(() => setShowHint(false), 2800)
     return () => clearTimeout(t)
+  }, [])
+  useEffect(() => {
+    return () => {
+      clearTimeout(advanceTimer.current)
+      clearTimeout(heartTimer.current)
+    }
   }, [])
 
   if (!game) {
@@ -147,7 +155,8 @@ export function GamePlay() {
     if (dir === 1) recordCardPlayed()
     setExitDir(dir)
     setIsExiting(true)
-    setTimeout(() => { setCardIndex(next); setCardKey(k => k + 1); setIsExiting(false) }, 220)
+    clearTimeout(advanceTimer.current)
+    advanceTimer.current = setTimeout(() => { setCardIndex(next); setCardKey(k => k + 1); setIsExiting(false) }, 220)
   }
   const goNext = () => advanceCard(1)
   const goPrev = () => advanceCard(-1)
@@ -171,7 +180,8 @@ export function GamePlay() {
     if (!currentCard) return
     toggleFavorite(currentCard, game.id, game.title)
     setHeartBeat(true)
-    setTimeout(() => setHeartBeat(false), 450)
+    clearTimeout(heartTimer.current)
+    heartTimer.current = setTimeout(() => setHeartBeat(false), 450)
   }
 
   /* card visual state */

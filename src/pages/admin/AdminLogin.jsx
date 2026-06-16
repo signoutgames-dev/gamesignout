@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, Gamepad2 } from 'lucide-react'
 import { useAdmin } from '../../context/AdminContext'
@@ -11,16 +11,22 @@ export function AdminLogin() {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const submitTimer = useRef(null)
 
   useEffect(() => {
     if (isAdmin) navigate('/admin/dashboard', { replace: true })
   }, [isAdmin, navigate])
 
+  useEffect(() => {
+    return () => clearTimeout(submitTimer.current)
+  }, [])
+
   const handleSubmit = (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-    setTimeout(() => {
+    clearTimeout(submitTimer.current)
+    submitTimer.current = setTimeout(() => {
       const ok = login(form.username.trim(), form.password)
       if (ok) navigate('/admin/dashboard', { replace: true })
       else { setError('Wrong username or password.'); setLoading(false) }
