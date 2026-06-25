@@ -1,14 +1,14 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { LayoutDashboard, Gamepad2, Heart, Trophy, LogIn, LogOut, User } from 'lucide-react'
+import { Home, Gamepad2, Compass, Bookmark, LogIn, LogOut, User, LayoutDashboard, Heart, Trophy } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
 import { useAuth } from '../../context/AuthContext'
 
 const NAV = [
-  { to: '/', icon: LayoutDashboard, label: 'Home', end: true },
+  { to: '/', icon: Home, label: 'Home', end: true },
   { to: '/play', icon: Gamepad2, label: 'Play' },
-  { to: '/favorites', icon: Heart, label: 'Favorites' },
-  { to: '/leaderboard', icon: Trophy, label: 'Leaderboard' },
+  { to: '/play', icon: Compass, label: 'Explore' },
+  { to: '/favorites', icon: Bookmark, label: 'Saved' },
 ]
 
 function useIsMobile() {
@@ -56,10 +56,10 @@ export function AppLayout() {
           <nav style={{ flex: 1, padding: '14px 12px', overflowY: 'auto' }}>
             <p style={{ fontSize: '10px', letterSpacing: '1.8px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)', padding: '0 12px', marginBottom: '10px', marginTop: '4px' }}>Menu</p>
             {NAV.map(({ to, icon: Icon, label, end }) => (
-              <NavLink key={to} to={to} end={end} style={sidebarNavStyle}>
+              <NavLink key={`${to}-${label}`} to={to} end={end} style={sidebarNavStyle}>
                 <Icon size={17} />
                 <span style={{ flex: 1 }}>{label}</span>
-                {label === 'Favorites' && favoritesCount > 0 && (
+                {label === 'Saved' && favoritesCount > 0 && (
                   <span style={{ background: '#e8453c', color: '#fff', borderRadius: '999px', fontSize: '10px', fontWeight: 700, padding: '2px 7px' }}>{favoritesCount}</span>
                 )}
               </NavLink>
@@ -129,7 +129,7 @@ export function AppLayout() {
       {isMobile && (
         <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: '64px', background: '#080808', borderTop: '1px solid #1c1c1c', display: 'flex', alignItems: 'center', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {NAV.map(({ to, icon: Icon, label, end }) => (
-            <NavLink key={to} to={to} end={end} style={({ isActive }) => ({
+            <NavLink key={`${to}-${label}`} to={to} end={end} style={({ isActive }) => ({
               flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               gap: '4px', textDecoration: 'none', padding: '8px 0',
               color: isActive ? '#e8453c' : 'rgba(255,255,255,0.35)',
@@ -140,7 +140,7 @@ export function AppLayout() {
                 <>
                   <div style={{ position: 'relative' }}>
                     <Icon size={22} />
-                    {label === 'Favorites' && favoritesCount > 0 && (
+                    {label === 'Saved' && favoritesCount > 0 && (
                       <span style={{ position: 'absolute', top: '-4px', right: '-6px', background: '#e8453c', color: '#fff', borderRadius: '999px', fontSize: '9px', fontWeight: 700, padding: '1px 4px', minWidth: '14px', textAlign: 'center' }}>{favoritesCount}</span>
                     )}
                   </div>

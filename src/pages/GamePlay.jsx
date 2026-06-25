@@ -122,6 +122,23 @@ export function GamePlay() {
   const heartTimer   = useRef(null)
 
   useEffect(() => { if (game) recordGameStarted(game.id) }, [game?.id]) // eslint-disable-line
+
+  // Persist session progress so Dashboard can show "Jump back in"
+  useEffect(() => {
+    if (!game || cardIndex === 0) return
+    const sessions = JSON.parse(localStorage.getItem('signout_sessions') || '[]')
+    const filtered = sessions.filter(s => s.gameId !== game.id)
+    const session = {
+      gameId: game.id,
+      gameTitle: game.title,
+      cardIndex,
+      totalCards: game.cards?.length || 100,
+      timestamp: Date.now(),
+      color: game.color || '#1742C5',
+    }
+    localStorage.setItem('signout_sessions', JSON.stringify([session, ...filtered].slice(0, 5)))
+  }, [cardIndex, game?.id]) // eslint-disable-line
+
   useEffect(() => {
     const t = setTimeout(() => setShowHint(false), 2800)
     return () => clearTimeout(t)

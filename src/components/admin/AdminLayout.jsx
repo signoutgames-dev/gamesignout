@@ -1,11 +1,12 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Gamepad2, MessageSquare, Tag, List, LogOut, ExternalLink } from 'lucide-react'
+import { LayoutDashboard, Gamepad2, MessageSquare, Tag, List, LogOut, ExternalLink, Layers } from 'lucide-react'
 import { useAdmin } from '../../context/AdminContext'
 
 const NAV = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/games', icon: Gamepad2, label: 'Games' },
   { to: '/admin/questions', icon: MessageSquare, label: 'Questions' },
+  { to: '/admin/moments', icon: Layers, label: 'Moments' },
   { to: '/admin/categories', icon: List, label: 'Categories' },
   { to: '/admin/tags', icon: Tag, label: 'Tags' },
 ]

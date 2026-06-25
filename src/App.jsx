@@ -10,7 +10,6 @@ import { AdminGuard } from './components/admin/AdminGuard'
 import { AdminLayout } from './components/admin/AdminLayout'
 import { Dashboard } from './pages/Dashboard'
 import { Favorites } from './pages/Favorites'
-import { Leaderboard } from './pages/Leaderboard'
 import { Play } from './pages/Play'
 import { HowToPlay } from './pages/HowToPlay'
 import { GamePlay } from './pages/GamePlay'
@@ -20,6 +19,7 @@ import { AdminGames } from './pages/admin/AdminGames'
 import { AdminQuestions } from './pages/admin/AdminQuestions'
 import { AdminCategories } from './pages/admin/AdminCategories'
 import { AdminTags } from './pages/admin/AdminTags'
+import { AdminMoments } from './pages/admin/AdminMoments'
 
 class ErrorBoundary extends Component {
   state = { error: null }
@@ -66,6 +66,7 @@ export function App() {
                     <Route path="/admin/dashboard" element={<AdminDashboard />} />
                     <Route path="/admin/games" element={<AdminGames />} />
                     <Route path="/admin/questions" element={<AdminQuestions />} />
+                    <Route path="/admin/moments" element={<AdminMoments />} />
                     <Route path="/admin/categories" element={<AdminCategories />} />
                     <Route path="/admin/tags" element={<AdminTags />} />
                   </Route>
@@ -75,7 +76,6 @@ export function App() {
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/favorites" element={<Favorites />} />
-                  <Route path="/leaderboard" element={<Leaderboard />} />
                 </Route>
               </Routes>
             </BrowserRouter>

@@ -49,10 +49,13 @@ function LevelBadge({ level }) {
 
 // ── Bulk Upload Modal ──────────────────────────────────────────────────────────
 function BulkUploadModal({ onClose, selectedGame, gameLabels, gameLevels, onUpload }) {
-  const [rows, setRows]       = useState(null)   // null = no file yet
+  const [rows, setRows]         = useState(null)
   const [parseError, setParseError] = useState('')
-  const [parsing, setParsing] = useState(false)
+  const [parsing, setParsing]   = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [done, setDone]         = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
   const fileRef = useRef(null)
 
   const downloadTemplate = async () => {
@@ -61,7 +64,7 @@ function BulkUploadModal({ onClose, selectedGame, gameLabels, gameLevels, onUplo
       const headers = ['label', 'text', 'level']
       const exampleRows = [
         [gameLabels[0] || 'NEVER HAVE I EVER', 'You have eaten a whole pizza alone', gameLevels[0] || ''],
-        [gameLabels[1] || gameLabels[0] || 'DARE',  'Tell everyone your most embarrassing moment', gameLevels[1] || gameLevels[0] || ''],
+        [gameLabels[1] || gameLabels[0] || 'DARE', 'Tell everyone your most embarrassing moment', gameLevels[1] || gameLevels[0] || ''],
       ]
       const ws = utils.aoa_to_sheet([headers, ...exampleRows])
       ws['!cols'] = [{ wch: 28 }, { wch: 60 }, { wch: 15 }]
@@ -73,9 +76,7 @@ function BulkUploadModal({ onClose, selectedGame, gameLabels, gameLevels, onUplo
 
   const parseFile = async (file) => {
     if (!file) return
-    setParsing(true)
-    setParseError('')
-    setRows(null)
+    setParsing(true); setParseError(''); setRows(null)
     try {
       const { read, utils } = await import('xlsx')
       const buffer = await file.arrayBuffer()
@@ -85,32 +86,22 @@ function BulkUploadModal({ onClose, selectedGame, gameLabels, gameLevels, onUplo
 
       if (raw.length === 0) {
         setParseError('The file has no data rows. Add a header row (label, text, level) and at least one data row.')
-        setParsing(false)
-        return
+        setParsing(false); return
       }
 
-      const parsed = raw.map((row) => {
-        // Normalize column names — accept many variants, case-insensitive
+      const parsed = raw.map(row => {
         const n = {}
         Object.keys(row).forEach(k => { n[k.toLowerCase().trim()] = String(row[k]).trim() })
-
-        const label = (
-          n['label'] || n['prompt'] || n['type'] || n['prompt type'] || n['prompttype'] || ''
-        ).toUpperCase() || gameLabels[0] || ''
-
-        const text = n['text'] || n['question'] || n['question text'] || n['questiontext'] || n['content'] || ''
+        const label = (n['label'] || n['prompt'] || n['type'] || n['prompt type'] || n['prompttype'] || '').toUpperCase() || gameLabels[0] || ''
+        const text  = n['text'] || n['question'] || n['question text'] || n['questiontext'] || n['content'] || ''
         const level = n['level'] || n['difficulty'] || n['round'] || ''
-
         return { label, text, level, valid: text.trim().length > 0 }
-      }).filter(r => r.label || r.text) // drop fully blank rows
+      }).filter(r => r.label || r.text)
 
-      const validCount = parsed.filter(r => r.valid).length
-      if (validCount === 0) {
+      if (parsed.filter(r => r.valid).length === 0) {
         setParseError('No valid questions found. Make sure your file has a column named "text" or "question" with content.')
-        setParsing(false)
-        return
+        setParsing(false); return
       }
-
       setRows(parsed)
     } catch {
       setParseError('Could not read the file. Make sure it is a valid .xlsx or .csv file.')
@@ -120,42 +111,103 @@ function BulkUploadModal({ onClose, selectedGame, gameLabels, gameLevels, onUplo
 
   const handleUpload = async () => {
     const valid = rows.filter(r => r.valid).map(({ label, text, level }) => ({ label, text, level }))
-    setUploading(true)
+    setUploading(true); setProgress(0)
+
+    // Animate progress bar while upload runs
+    const total = valid.length
+    let fake = 0
+    const ticker = setInterval(() => {
+      fake += Math.random() * 18
+      setProgress(Math.min(fake, 88))
+    }, 120)
+
     await onUpload(valid)
-    setUploading(false)
-    onClose()
+    clearInterval(ticker)
+    setProgress(100)
+    await new Promise(r => setTimeout(r, 420))
+    setUploading(false); setDone(true)
+  }
+
+  // Drag & drop handlers
+  const onDragOver = e => { e.preventDefault(); setIsDragging(true) }
+  const onDragLeave = e => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false) }
+  const onDrop = e => {
+    e.preventDefault(); setIsDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) parseFile(file)
   }
 
   const validCount = rows ? rows.filter(r => r.valid).length : 0
   const skipCount  = rows ? rows.filter(r => !r.valid).length : 0
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '20px' }}
-      onClick={(e) => { if (e.target === e.currentTarget && !uploading) onClose() }}>
-      <div style={{ background: '#111', border: '1px solid #222', borderRadius: '16px', width: '100%', maxWidth: '640px', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 32px 64px rgba(0,0,0,0.8)' }}>
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '20px' }}
+      onClick={e => { if (e.target === e.currentTarget && !uploading) onClose() }}
+    >
+      <div style={{ background: '#111', border: '1px solid #222', borderRadius: '18px', width: '100%', maxWidth: '640px', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.85)' }}>
+
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '20px 24px', borderBottom: '1px solid #1e1e1e' }}>
           <div>
             <h2 style={{ fontWeight: 800, fontSize: '16px', color: '#fff', margin: '0 0 3px' }}>Bulk Upload Questions</h2>
-            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', margin: 0 }}>{selectedGame?.title}</p>
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', margin: 0 }}>
+              {selectedGame?.title} · {selectedGame?.cards?.length || 0} existing cards
+            </p>
           </div>
-          {!uploading && (
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', flexShrink: 0 }}><X size={18} /></button>
+          {!uploading && !done && (
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', flexShrink: 0 }}>
+              <X size={18} />
+            </button>
           )}
         </div>
 
+        {/* Upload progress bar (shows while uploading) */}
+        {uploading && (
+          <div style={{ height: '3px', background: '#1a1a1a' }}>
+            <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #e8453c, #ff6148)', transition: 'width 0.15s linear' }} />
+          </div>
+        )}
+
         <div style={{ padding: '24px' }}>
+
+          {/* ── Success state ── */}
+          {done && (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
+              <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#fff', margin: '0 0 8px' }}>{validCount} question{validCount !== 1 ? 's' : ''} added!</h3>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.45)', margin: '0 0 24px' }}>
+                {selectedGame?.title} now has {(selectedGame?.cards?.length || 0) + validCount} cards.
+              </p>
+              <button
+                onClick={onClose}
+                style={{ background: '#e8453c', border: 'none', borderRadius: '9px', padding: '11px 28px', color: '#fff', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}
+              >
+                Done
+              </button>
+            </div>
+          )}
+
+          {/* ── Uploading state ── */}
+          {uploading && !done && (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '3px solid #e8453c', borderTopColor: 'transparent', margin: '0 auto 20px', animation: 'spin 0.8s linear infinite' }} />
+              <p style={{ fontSize: '14px', fontWeight: 700, color: '#fff', margin: '0 0 6px' }}>Uploading {validCount} question{validCount !== 1 ? 's' : ''}…</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', margin: 0 }}>{Math.round(progress)}%</p>
+            </div>
+          )}
+
           {/* ── Step 1: no file yet ── */}
-          {!rows && (
+          {!rows && !uploading && !done && (
             <>
               {/* Column guide */}
               <div style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: '10px', padding: '14px 16px', marginBottom: '14px' }}>
                 <p style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', margin: '0 0 10px', letterSpacing: '0.8px' }}>REQUIRED COLUMNS IN YOUR FILE</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
                   {[
-                    { col: 'label',  note: `Prompt type — e.g. ${gameLabels.slice(0, 2).join(', ')}`,                   req: false },
-                    { col: 'text',   note: 'The question content',                                                        req: true  },
-                    { col: 'level',  note: gameLevels.length ? `Difficulty — e.g. ${gameLevels.join(', ')}` : 'Difficulty (optional)', req: false },
+                    { col: 'label', note: `Prompt type — e.g. ${gameLabels.slice(0, 2).join(', ')}`, req: false },
+                    { col: 'text',  note: 'The question content', req: true },
+                    { col: 'level', note: gameLevels.length ? `Difficulty — e.g. ${gameLevels.join(', ')}` : 'Difficulty (optional)', req: false },
                   ].map(({ col, note, req }) => (
                     <div key={col} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <code style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', color: '#f5c542', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{col}</code>
@@ -166,71 +218,92 @@ function BulkUploadModal({ onClose, selectedGame, gameLabels, gameLevels, onUplo
                 </div>
               </div>
 
-              {/* Download template */}
               <button
                 onClick={downloadTemplate}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', background: 'transparent', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '9px 14px', color: 'rgba(255,255,255,0.55)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginBottom: '14px', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#444'; e.currentTarget.style.color = '#fff' }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.color = 'rgba(255,255,255,0.55)' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#555'; e.currentTarget.style.color = '#fff' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.color = 'rgba(255,255,255,0.55)' }}
               >
                 ↓ Download Template (.xlsx)
               </button>
 
-              {/* File picker */}
+              {/* Drop zone — click or drag */}
               <div
                 onClick={() => !parsing && fileRef.current?.click()}
-                style={{ border: '2px dashed #2a2a2a', borderRadius: '12px', padding: '40px 24px', textAlign: 'center', cursor: parsing ? 'default' : 'pointer', transition: 'border-color 0.15s, background 0.15s' }}
-                onMouseEnter={(e) => { if (!parsing) { e.currentTarget.style.borderColor = '#e8453c'; e.currentTarget.style.background = 'rgba(232,69,60,0.04)' } }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.background = 'transparent' }}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onDrop={onDrop}
+                style={{
+                  border: `2px dashed ${isDragging ? '#e8453c' : parsing ? '#333' : '#2a2a2a'}`,
+                  borderRadius: '14px',
+                  padding: '44px 24px',
+                  textAlign: 'center',
+                  cursor: parsing ? 'default' : 'pointer',
+                  background: isDragging ? 'rgba(232,69,60,0.06)' : 'transparent',
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
+                onMouseEnter={e => { if (!parsing && !isDragging) { e.currentTarget.style.borderColor = '#e8453c'; e.currentTarget.style.background = 'rgba(232,69,60,0.04)' } }}
+                onMouseLeave={e => { if (!isDragging) { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.background = 'transparent' } }}
               >
-                {parsing
-                  ? <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Parsing file…</p>
-                  : (
-                    <>
-                      <Upload size={28} color="rgba(255,255,255,0.2)" style={{ marginBottom: '10px' }} />
-                      <p style={{ color: '#fff', fontSize: '13px', fontWeight: 700, margin: '0 0 4px' }}>Click to choose a file</p>
-                      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', margin: 0 }}>Supports .xlsx and .csv</p>
-                    </>
-                  )
-                }
+                {parsing ? (
+                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Parsing file…</p>
+                ) : isDragging ? (
+                  <>
+                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>📂</div>
+                    <p style={{ color: '#e8453c', fontSize: '14px', fontWeight: 800, margin: 0 }}>Drop to upload</p>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={30} color="rgba(255,255,255,0.18)" style={{ marginBottom: '12px' }} />
+                    <p style={{ color: '#fff', fontSize: '14px', fontWeight: 700, margin: '0 0 5px' }}>Click or drag & drop a file</p>
+                    <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', margin: 0 }}>Supports .xlsx and .csv</p>
+                  </>
+                )}
               </div>
               <input
                 ref={fileRef}
                 type="file"
                 accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                 style={{ display: 'none' }}
-                onChange={(e) => parseFile(e.target.files[0])}
+                onChange={e => parseFile(e.target.files[0])}
               />
 
               {parseError && (
-                <div style={{ background: 'rgba(232,69,60,0.1)', border: '1px solid rgba(232,69,60,0.25)', borderRadius: '8px', padding: '10px 14px', marginTop: '12px', fontSize: '13px', color: '#e8453c' }}>
-                  {parseError}
+                <div style={{ background: 'rgba(232,69,60,0.1)', border: '1px solid rgba(232,69,60,0.25)', borderRadius: '10px', padding: '12px 16px', marginTop: '14px', fontSize: '13px', color: '#e8453c', lineHeight: 1.5 }}>
+                  ⚠ {parseError}
                 </div>
               )}
             </>
           )}
 
           {/* ── Step 2: preview ── */}
-          {rows && (
+          {rows && !uploading && !done && (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <p style={{ fontSize: '13px', margin: 0 }}>
-                  <span style={{ color: '#fff', fontWeight: 700 }}>{validCount}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.5)' }}> question{validCount !== 1 ? 's' : ''} ready</span>
-                  {skipCount > 0 && <span style={{ color: 'rgba(255,255,255,0.3)' }}> · {skipCount} row{skipCount !== 1 ? 's' : ''} skipped (empty)</span>}
-                </p>
+              {/* Summary banner */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: '10px', padding: '12px 16px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', gap: '20px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '22px', fontWeight: 900, color: '#22c55e', margin: 0, lineHeight: 1 }}>{validCount}</p>
+                    <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', margin: '3px 0 0', fontWeight: 600 }}>READY</p>
+                  </div>
+                  {skipCount > 0 && (
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ fontSize: '22px', fontWeight: 900, color: '#e8453c', margin: 0, lineHeight: 1 }}>{skipCount}</p>
+                      <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', margin: '3px 0 0', fontWeight: 600 }}>SKIPPED</p>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => { setRows(null); setParseError(''); if (fileRef.current) fileRef.current.value = '' }}
-                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                  style={{ background: 'none', border: '1px solid #252525', borderRadius: '6px', padding: '5px 12px', color: 'rgba(255,255,255,0.45)', fontSize: '12px', cursor: 'pointer' }}
                 >
                   Change file
                 </button>
               </div>
 
               {/* Preview table */}
-              <div style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: '10px', overflow: 'hidden', maxHeight: '300px', overflowY: 'auto', marginBottom: '16px' }}>
-                {/* Sticky header */}
-                <div style={{ display: 'grid', gridTemplateColumns: '130px 100px 1fr', padding: '9px 14px', borderBottom: '1px solid #1e1e1e', position: 'sticky', top: 0, background: '#0d0d0d', zIndex: 1 }}>
+              <div style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: '10px', overflow: 'hidden', maxHeight: '280px', overflowY: 'auto', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '130px 90px 1fr', padding: '9px 14px', borderBottom: '1px solid #1e1e1e', position: 'sticky', top: 0, background: '#0d0d0d', zIndex: 1 }}>
                   {['Label', 'Level', 'Question Text'].map(h => (
                     <span key={h} style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1px', textTransform: 'uppercase' }}>{h}</span>
                   ))}
@@ -238,7 +311,7 @@ function BulkUploadModal({ onClose, selectedGame, gameLabels, gameLevels, onUplo
                 {rows.map((r, i) => (
                   <div
                     key={i}
-                    style={{ display: 'grid', gridTemplateColumns: '130px 100px 1fr', padding: '9px 14px', borderBottom: i < rows.length - 1 ? '1px solid #161616' : 'none', alignItems: 'center', opacity: r.valid ? 1 : 0.4 }}
+                    style={{ display: 'grid', gridTemplateColumns: '130px 90px 1fr', padding: '9px 14px', borderBottom: i < rows.length - 1 ? '1px solid #161616' : 'none', alignItems: 'center', background: r.valid ? 'transparent' : 'rgba(232,69,60,0.05)' }}
                   >
                     <span style={{ fontSize: '9px', fontWeight: 800, color: '#f5c542', letterSpacing: '0.8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '8px' }}>
                       {r.label || '—'}
@@ -247,7 +320,7 @@ function BulkUploadModal({ onClose, selectedGame, gameLabels, gameLevels, onUplo
                       ? <span style={{ display: 'inline-block', background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.28)', borderRadius: '999px', padding: '1px 8px', fontSize: '10px', fontWeight: 700, color: '#a78bfa', width: 'fit-content' }}>{r.level}</span>
                       : <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '11px' }}>—</span>
                     }
-                    <p style={{ fontSize: '12px', color: r.valid ? 'rgba(255,255,255,0.8)' : '#e8453c', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <p style={{ fontSize: '12px', color: r.valid ? 'rgba(255,255,255,0.8)' : '#e8453c', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: r.valid ? 'normal' : 'italic' }}>
                       {r.valid ? r.text : '(empty — will be skipped)'}
                     </p>
                   </div>
@@ -255,21 +328,25 @@ function BulkUploadModal({ onClose, selectedGame, gameLabels, gameLevels, onUplo
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button onClick={onClose} disabled={uploading} style={{ background: 'transparent', border: '1px solid #252525', borderRadius: '8px', padding: '10px 18px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={onClose} style={{ background: 'transparent', border: '1px solid #252525', borderRadius: '8px', padding: '10px 18px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                   Cancel
                 </button>
                 <button
                   onClick={handleUpload}
-                  disabled={uploading || validCount === 0}
-                  style={{ background: uploading || validCount === 0 ? '#2a2a2a' : '#e8453c', border: 'none', borderRadius: '8px', padding: '10px 22px', color: uploading || validCount === 0 ? 'rgba(255,255,255,0.3)' : '#fff', fontSize: '13px', fontWeight: 800, cursor: uploading || validCount === 0 ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}
+                  disabled={validCount === 0}
+                  style={{ background: validCount === 0 ? '#2a2a2a' : '#e8453c', border: 'none', borderRadius: '8px', padding: '10px 24px', color: validCount === 0 ? 'rgba(255,255,255,0.3)' : '#fff', fontSize: '13px', fontWeight: 800, cursor: validCount === 0 ? 'not-allowed' : 'pointer', transition: 'transform 0.1s' }}
+                  onMouseDown={e => { if (validCount > 0) e.currentTarget.style.transform = 'scale(0.97)' }}
+                  onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}
                 >
-                  {uploading ? 'Uploading…' : `Upload ${validCount} Question${validCount !== 1 ? 's' : ''}`}
+                  Upload {validCount} Question{validCount !== 1 ? 's' : ''}
                 </button>
               </div>
             </>
           )}
         </div>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }

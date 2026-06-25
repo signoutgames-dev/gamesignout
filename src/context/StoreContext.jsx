@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { GAMES as DEFAULT_GAMES, CATEGORIES as DEFAULT_CATEGORIES } from '../data/games'
+import { GAMES as DEFAULT_GAMES, CATEGORIES as DEFAULT_CATEGORIES, MOMENTS as DEFAULT_MOMENTS } from '../data/games'
 import { db } from '../lib/firebase'
 import {
   collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc,
@@ -9,7 +9,7 @@ import {
 const StoreContext = createContext(null)
 
 const DEFAULT_TAGS = [...new Set(DEFAULT_GAMES.flatMap(g => g.tags))]
-const DATA_VERSION = 3
+const DATA_VERSION = 4
 
 async function seedIfEmpty() {
   const configSnap = await getDoc(doc(db, 'meta', 'config'))
@@ -24,14 +24,24 @@ async function seedIfEmpty() {
   await batch.commit()
 }
 
+async function seedMomentsIfEmpty() {
+  const snap = await getDocs(collection(db, 'moments'))
+  if (!snap.empty) return
+  const batch = writeBatch(db)
+  DEFAULT_MOMENTS.forEach(m => batch.set(doc(db, 'moments', m.id), m))
+  await batch.commit()
+}
+
 export function StoreProvider({ children }) {
   const [games, setGames] = useState([])
   const [categories, setCategories] = useState([])
   const [tags, setTags] = useState([])
+  const [moments, setMoments] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     seedIfEmpty()
+    seedMomentsIfEmpty()
 
     const unsubGames = onSnapshot(collection(db, 'games'), snap => {
       setGames(snap.docs.map(d => d.data()))
@@ -43,8 +53,11 @@ export function StoreProvider({ children }) {
     const unsubTags = onSnapshot(doc(db, 'meta', 'tags'), snap => {
       setTags(snap.exists() ? (snap.data().list ?? []) : [])
     })
+    const unsubMoments = onSnapshot(collection(db, 'moments'), snap => {
+      setMoments(snap.docs.map(d => d.data()))
+    })
 
-    return () => { unsubGames(); unsubCats(); unsubTags() }
+    return () => { unsubGames(); unsubCats(); unsubTags(); unsubMoments() }
   }, [])
 
   // Games
@@ -96,6 +109,19 @@ export function StoreProvider({ children }) {
     return withIds.length
   }, [])
 
+  // Moments
+  const addMoment = useCallback(async (m) => {
+    await setDoc(doc(db, 'moments', m.id), m)
+  }, [])
+
+  const editMoment = useCallback(async (id, data) => {
+    await updateDoc(doc(db, 'moments', id), data)
+  }, [])
+
+  const deleteMoment = useCallback(async (id) => {
+    await deleteDoc(doc(db, 'moments', id))
+  }, [])
+
   // Categories
   const addCategory = useCallback(async (cat) => {
     await setDoc(doc(db, 'categories', cat.id), cat)
@@ -125,9 +151,10 @@ export function StoreProvider({ children }) {
 
   return (
     <StoreContext.Provider value={{
-      games, categories, tags, loading,
+      games, categories, tags, moments, loading,
       addGame, editGame, deleteGame,
       addCard, editCard, deleteCard, bulkAddCards,
+      addMoment, editMoment, deleteMoment,
       addCategory, editCategory, deleteCategory,
       addTag, deleteTag,
     }}>
